@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>コピー＆ペーストで読むツール</title>
+  <style>
+    body {
+      font-family: "Helvetica Neue", Arial, sans-serif;
+      margin: 2rem;
+    }
+    .container {
+      max-width: 585px;
+      margin: 0 auto;
+      padding: 1rem;
+      font-size: 21px;
+      line-height: 1.6;
+      border: 1px solid #ccc;
+      min-height: 300px;
+      outline: none;
+    }
+  </style>
+</head>
+<body>
+  
+  <div id="textContainer" class="container" contenteditable="true"></div>
+
+  <script>
+    const textContainer = document.getElementById('textContainer');
+    
+    // -------------------------------
+    // (1) ページ読み込み時にサーバーからテキストを取得
+    // -------------------------------
+    window.addEventListener('load', async () => {
+      try {
+        // getText (Netlify Functions) を呼び出す
+        const response = await fetch('/.netlify/functions/getText');
+        if (!response.ok) throw new Error('Failed to fetch text');
+
+        const data = await response.json();
+        if (data.text) {
+          textContainer.innerHTML = data.text;
+          textContainer.style.border = 'none';
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    });
+
+    // -------------------------------
+    // (2) テキストが変更されたらサーバーに保存
+    // -------------------------------
+    async function handleChange() {
+      // 枠線制御
+      if (textContainer.innerText.trim().length > 0) {
+        textContainer.style.border = 'none';
+      } else {
+        textContainer.style.border = '1px solid #ccc';
+      }
+
+      try {
+        // saveText (Netlify Functions) へリクエスト
+        const res = await fetch('/.netlify/functions/saveText', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: textContainer.innerHTML })
+        });
+        if (!res.ok) {
+          throw new Error('Failed to save text');
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // イベントを監視: 入力 or ペーストのたびにサーバーに送る
+    textContainer.addEventListener('input', handleChange);
+    textContainer.addEventListener('paste', () => {
+      setTimeout(handleChange, 0);
+    });
+  </script>
+</body>
+</html>
